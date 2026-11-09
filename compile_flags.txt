@@ -1,0 +1,5 @@
+-std=c23
+-Isrc/include
+-Wall
+-Wextra
+-Werror

@@ -1,0 +1,26 @@
+`test cond exprs and stmts`
+
+let a = 1, b = -3, test1 = nil, test2 = nil;
+
+`cond expression`
+test1 = cond {
+    b > 0: 1,
+    b < 0: -1,
+    else: 0
+};
+
+assert(test1 == -1);
+
+cond {
+    a < 0: {
+        test2 = -1;
+    },
+    a > 0: {
+        test2 = 1;
+    },
+    else: {
+        test2 = 0;
+    } 
+}
+
+assert(test2 == 1);

@@ -1,0 +1,17 @@
+`test metatables`
+
+let foo = ${
+    a: 1,
+    b: 2,
+    x: ${
+        a: 42
+    }
+};
+
+let bar = $[1, 2];
+
+assert(foo.a == 1);
+assert(foo.b == 2);
+assert(foo.x.a == 42);
+assert(bar.(0) == 1);
+assert(bar.(1) == 2);

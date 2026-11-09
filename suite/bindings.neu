@@ -1,0 +1,20 @@
+`
+    this is
+    a block comment
+`
+
+def a = 42, b = true, n = nil;
+
+def f = fun () -> {
+    ret 1;
+};
+
+def f1 = fun (a, b) -> {
+    ret a + b;
+};
+
+assert(a == 42);
+assert(b);
+assert(?n);
+assert(f() == 1);
+assert(f1(a, a) == 84);
