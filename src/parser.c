@@ -165,9 +165,12 @@ ast_node* nl_parse_literal(parser* p, const str* source) {
     return nullptr;
 }
 
+// ! Syntax Rules:
+// ! <array> ::= "[" <expr> ("," <expr>)* "]"
+// ! JS holed arrays are DISGUSTING, so Neu will disallow shit like `[,,,,]`
 [[nodiscard]]
 ast_node* nl_parse_literal_array(parser* p, const str* source) {
-    return nullptr; // todo
+    return nullptr; // todo: as stated in README
 }
 
 [[nodiscard]]
@@ -175,12 +178,12 @@ table_prop nl_parse_table_prop(parser* p, const str* source) {
     return (table_prop) {
         .key = nullptr,
         .expr = nullptr
-    }; // todo
+    }; // todo: implement this as stated in README
 }
 
 [[nodiscard]]
 ast_node* nl_parse_literal_table(parser* p, const str* source) {
-    return nullptr; // todo
+    return nullptr; // todo: implement this as stated in README
 }
 
 // ! Syntax Rules:

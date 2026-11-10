@@ -11,6 +11,9 @@ target_sources(neu_impl PRIVATE
     "${NEU_SRCS}/lexer.c"
     "${NEU_SRCS}/ast.c"
     "${NEU_SRCS}/parser.c"
+    "${NEU_SRCS}/pool.c"
+    "${NEU_SRCS}/bytecode.c"
+    "${NEU_SRCS}/var_scope.c"
 )
 
 add_executable(neu "${NEU_SRCS}/main.c")
