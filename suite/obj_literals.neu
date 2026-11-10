@@ -1,6 +1,6 @@
 `test metatables`
 
-let foo = ${
+def foo = ${
     a: 1,
     b: 2,
     x: ${
@@ -8,7 +8,7 @@ let foo = ${
     }
 };
 
-let bar = $[1, 2];
+def bar = $[1, 2];
 
 assert(foo.a == 1);
 assert(foo.b == 2);

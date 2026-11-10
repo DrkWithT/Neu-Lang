@@ -48,6 +48,10 @@ typedef enum nl_ast_op : uint8_t {
     nl_ast_op_and,
     nl_ast_op_or,
     nl_ast_op_bind,
+    nl_ast_op_bind_mul,
+    nl_ast_op_bind_div,
+    nl_ast_op_bind_add,
+    nl_ast_op_bind_sub,
 } ast_op;
 
 typedef struct nl_ast_node_t ast_node;
@@ -121,7 +125,7 @@ typedef struct nl_ast_expr_binary_logical_t {
 typedef struct nl_ast_expr_assign_t {
     ast_node* dest;
     ast_node* src;
-    // ast_op op;
+    ast_op op;
 } expr_assign;
 
 /**

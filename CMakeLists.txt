@@ -9,6 +9,8 @@ target_sources(neu_impl PRIVATE
     "${NEU_SRCS}/dynbuf.c"
     "${NEU_SRCS}/token.c"
     "${NEU_SRCS}/lexer.c"
+    "${NEU_SRCS}/ast.c"
+    "${NEU_SRCS}/parser.c"
 )
 
 add_executable(neu "${NEU_SRCS}/main.c")

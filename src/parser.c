@@ -15,6 +15,12 @@ static constexpr def_binding nl_invalid_def_bind_v = {
 
 
 [[nodiscard]]
+ast_node* nl_parse_cond(parser* p, const str* source, bool is_expr);
+
+[[nodiscard]]
+ast_node* nl_parse_loop(parser* p, const str* source, bool is_expr);
+
+[[nodiscard]]
 ast_node* nl_parse_block(parser* p, const str* source, bool is_expr);
 
 [[nodiscard]]
@@ -78,7 +84,7 @@ bool parser_consume_of(parser* p, const str* source, const tk_tag* tags, size_t 
 
 void parser_report_mini_error(parser* p, uint16_t error_line, uint16_t error_col, const char* error_msg) {
     p->errors++;
-    fprintf(stdout, "Syntax Error #\x1b[1;35m%d\x1b[0m ~ \x1b[1;35msource:%d:%d\x1b[0m\n\t%s\n\n", p->errors,  error_line, error_col, error_msg);
+    fprintf(stdout, "Parse Error (\x1b[1;31m%d\x1b[0m) ~ \x1b[1;34msource\x1b[0m:\x1b[1;33m%d\x1b[0m:\x1b[1;33m%d\x1b[0m\n\t%s\n\n", p->errors,  error_line, error_col, error_msg);
 }
 
 // void parser_report_error(parser* p, const str* source, uint16_t sub_src_begin, uint16_t sub_src_end, uint16_t line, uint16_t error_line, const char* error_msg) {
@@ -131,6 +137,26 @@ ast_node* nl_parse_literal(parser* p, const str* source) {
                 .tag = nl_ast_literal
             });
         }
+        case nl_tk_kw_cond: return nl_parse_cond(p, source, true);
+        case nl_tk_kw_loop: return nl_parse_loop(p, source, true);
+        case nl_tk_lparen: {
+            parser_consume(p, source);
+
+            auto wrapped_expr = nl_parse_next(p, source, true);
+            if (!wrapped_expr) {
+                return nullptr;
+            }
+
+            if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_rparen }, 1)) {
+                parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' closing this parenthesized expression.");
+
+                ast_node_del(wrapped_expr);
+                return nullptr;
+            }
+
+            return wrapped_expr;
+        }
+        case nl_tk_lbrace: return nl_parse_block(p, source, true);
         default: break;
     }
 
@@ -165,7 +191,7 @@ ast_node* nl_parse_expr_func(parser* p, const str* source) {
     parser_consume(p, source); // ? eat prechecked 'fun'
 
     if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_lparen}, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '(' here in lambda");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '(' starting lambda parameters.");
 
         return nullptr;
     }
@@ -174,7 +200,7 @@ ast_node* nl_parse_expr_func(parser* p, const str* source) {
 
     if (!parser_match(p, (tk_tag[]) {nl_tk_rparen}, 1)) {
         if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_identifier}, 1)) {
-            parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected 1st param name");
+            parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected 1st parameter as a name.");
 
             dynbuf_del(&param_tokens);
             return nullptr;
@@ -188,7 +214,7 @@ ast_node* nl_parse_expr_func(parser* p, const str* source) {
         }
 
         if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_identifier}, 1)) {
-            parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected following param name");
+            parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected following parameter name.");
 
             dynbuf_del(&param_tokens);
             return nullptr;
@@ -199,14 +225,14 @@ ast_node* nl_parse_expr_func(parser* p, const str* source) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_rparen}, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' closing params");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' closing parameters.");
 
         dynbuf_del(&param_tokens);
         return nullptr;
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_arrow }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '->' before lambda body");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '->' before lambda body.");
 
         dynbuf_del(&param_tokens);
         return nullptr;
@@ -248,24 +274,23 @@ ast_node* nl_parse_expr_call(parser* p, const str* source) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_lparen}, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col,  "Expected '(' starting args");
-
-        ast_node_del(callee_ptr);
-        return nullptr;
+        return callee_ptr; // ? no '(' means no argument list completes a call... just pass on the expression...
     }
 
     auto temp_args = dynbuf_new(sizeof(ast_node), 4, ast_node_del);
 
-    if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_rparen}, 1)) {
+    if (!parser_match(p, (tk_tag[]) { nl_tk_rparen }, 1)) {
         auto first_arg_p = nl_parse_next(p, source, true);
         if (!first_arg_p) {
             dynbuf_del(&temp_args);
             ast_node_del(callee_ptr);
             return nullptr;
         }
+
+        dynbuf_push(&temp_args, first_arg_p);
     }
 
-    while (parser_at_eof(p)) {
+    while (!parser_at_eof(p)) {
         if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_comma}, 1)) {
             break;
         }
@@ -281,7 +306,7 @@ ast_node* nl_parse_expr_call(parser* p, const str* source) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) {nl_tk_rparen}, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' closing args");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' closing args.");
 
         dynbuf_del(&temp_args);
         ast_node_del(callee_ptr);
@@ -318,6 +343,10 @@ ast_node* nl_parse_unary_prefix(parser* p, const str* source) {
     auto inner_expr_ptr = nl_parse_expr_call(p, source);
     if (!inner_expr_ptr) {
         return nullptr;
+    }
+
+    if (unary_ast_op == nl_ast_op_none) {
+        return inner_expr_ptr;
     }
 
     return nl_make_ast_ptr((ast_node) {
@@ -617,15 +646,30 @@ ast_node* nl_parse_logical_or(parser* p, const str* source) {
 }
 
 [[nodiscard]]
+static inline ast_op tk_tag_to_assign_op(tk_tag t) {
+    switch (t) {
+        case nl_tk_op_bind: return nl_ast_op_bind;
+        case nl_tk_op_bind_mul: return nl_ast_op_bind_mul;
+        case nl_tk_op_bind_div: return nl_ast_op_bind_div;
+        case nl_tk_op_bind_add: return nl_ast_op_bind_add;
+        case nl_tk_op_bind_sub: return nl_ast_op_bind_sub;
+        default: return nl_ast_op_none;
+    }
+}
+
+[[nodiscard]]
 ast_node* nl_parse_assignment(parser* p, const str* source) {
-    ast_node* dest_ptr = nl_parse_expr_call(p, source);
+    ast_node* dest_ptr = nl_parse_logical_or(p, source);
     if (!dest_ptr) {
         return nullptr;
     }
 
-    if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_op_bind }, 1)) {
+    const auto assignment_op = tk_tag_to_assign_op(p->curr.tag);
+
+    if (assignment_op == nl_ast_op_none) {
         return dest_ptr;
     }
+    parser_consume(p, source);
 
     ast_node* src_ptr = nl_parse_assignment(p, source);
     if (!src_ptr) {
@@ -636,7 +680,8 @@ ast_node* nl_parse_assignment(parser* p, const str* source) {
     return nl_make_ast_ptr((ast_node) {
         .data.ass = {
             .dest = dest_ptr,
-            .src = src_ptr
+            .src = src_ptr,
+            .op = assignment_op
         },
         .tag = nl_ast_expr_assign
     });
@@ -654,7 +699,7 @@ cond_entry nl_parse_cond_entry(parser* p, const str* source, bool in_cond_expr) 
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_colon }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ':' after conditional case's checking expr");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ':' after conditional case's checking expr.");
 
         ast_node_del(check_ptr);
         return nl_invalid_cond_entry_v;
@@ -677,7 +722,7 @@ ast_node* nl_parse_cond(parser* p, const str* source, bool is_expr) {
     parser_consume(p, source); // ? eat prechecked 'cond'
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_lbrace }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '{' opening a conditional's cases here");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '{' opening a conditional's cases here.");
         return nullptr;
     }
 
@@ -692,10 +737,7 @@ ast_node* nl_parse_cond(parser* p, const str* source, bool is_expr) {
 
     while (!parser_at_eof(p)) {        
         if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_comma }, 1)) {
-            parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ',' between conditional cases here.");
-
-            dynbuf_del(&cond_entries);
-            return nullptr;
+            break;
         }
 
         auto next_entry = nl_parse_cond_entry(p, source, is_expr);
@@ -709,7 +751,7 @@ ast_node* nl_parse_cond(parser* p, const str* source, bool is_expr) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_rbrace }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '}' closing a conditional's cases here");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '}' closing a conditional's cases here.");
         return nullptr;
     }
 
@@ -729,7 +771,7 @@ ast_node* nl_parse_loop(parser* p, const str* source, bool is_expr) {
     parser_consume(p, source); // ? eat prechecked 'loop'
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_lparen }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '(' here in this loop");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '(' here in this loop.");
 
         return nullptr;
     }
@@ -740,8 +782,9 @@ ast_node* nl_parse_loop(parser* p, const str* source, bool is_expr) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_semicolon }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ';' after initial loop expression");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ';' after initial loop expression.");
 
+        ast_node_del(initial_expr_ptr);
         return nullptr;
     }
 
@@ -752,8 +795,9 @@ ast_node* nl_parse_loop(parser* p, const str* source, bool is_expr) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_semicolon }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ';' after loop check");
-
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ';' after loop check.");
+        ast_node_del(initial_expr_ptr);
+        ast_node_del(check_expr_ptr);
         return nullptr;
     }
 
@@ -765,7 +809,7 @@ ast_node* nl_parse_loop(parser* p, const str* source, bool is_expr) {
     }
 
     if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_rparen }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' here in this loop");
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ')' here in this loop.");
 
         ast_node_del(initial_expr_ptr);
         ast_node_del(check_expr_ptr);
@@ -781,13 +825,29 @@ ast_node* nl_parse_loop(parser* p, const str* source, bool is_expr) {
         return nullptr;
     }
 
-    ast_node* result_ptr = nl_parse_next(p, source, true);
-    if (!result_ptr) {
-        ast_node_del(initial_expr_ptr);
-        ast_node_del(check_expr_ptr);
-        ast_node_del(update_expr_ptr);
-        ast_node_del(loop_body_ptr);
-        return nullptr;
+    ast_node* result_ptr = nullptr;
+
+    if (is_expr) {
+        if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_arrow }, 1)) {
+
+            parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '->' before loop expression's result.");
+            
+            ast_node_del(initial_expr_ptr);
+            ast_node_del(check_expr_ptr);
+            ast_node_del(update_expr_ptr);
+            ast_node_del(loop_body_ptr);
+            return nullptr;
+        }
+
+        result_ptr = nl_parse_next(p, source, true);
+
+        if (!result_ptr) {
+            ast_node_del(initial_expr_ptr);
+            ast_node_del(check_expr_ptr);
+            ast_node_del(update_expr_ptr);
+            ast_node_del(loop_body_ptr);
+            return nullptr;
+        }
     }
 
     return nl_make_ast_ptr((ast_node) {
@@ -898,6 +958,14 @@ ast_node* nl_parse_stmt_def(parser* p, const str* source) {
             dynbuf_del(&var_bindings);
             return nullptr;
         }
+        dynbuf_push(&var_bindings, &next_var);
+    }
+
+    if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_semicolon }, 1)) {
+        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected ';' closing variable defines here.");
+
+        dynbuf_del(&var_bindings);
+        return nullptr;
     }
 
     return nl_make_ast_ptr((ast_node) {
@@ -914,20 +982,14 @@ ast_node* nl_parse_block(parser* p, const str* source, bool is_expr) {
 
     auto block_items = dynbuf_new(sizeof(ast_node), 4, ast_node_del);
 
-    if (!parser_consume_of(p, source, (tk_tag[]) { nl_tk_lbrace }, 1)) {
-        parser_report_mini_error(p, p->curr.line, p->curr.col, "Expected '{' opening a block's items here");
-        return nullptr;
-    }
-
     while (!parser_at_eof(p)) {
-        if (parser_match(p, (tk_tag[]) { nl_tk_rbrace }, 1)) {
+        if (parser_consume_of(p, source, (tk_tag[]) { nl_tk_rbrace }, 1)) {
             break;
         }
 
         auto next_item_ptr = nl_parse_next(p, source, false);
+        dynbuf_push(&block_items, &next_item_ptr);
     }
-
-    parser_consume(p, source); // ? eat prechecked '}'
 
     return nl_make_ast_ptr((ast_node) {
         .data.bl = {
@@ -979,6 +1041,7 @@ ast_node* nl_parse_next(parser* p, const str* source, bool is_expr) {
             case nl_tk_kw_break: return nl_parse_loop_abator(p, source, true);
             case nl_tk_kw_continue: return nl_parse_loop_abator(p, source, false);
             case nl_tk_kw_ret: return nl_parse_stmt_ret(p, source);
+            case nl_tk_lbrace: return nl_parse_block(p, source, false);
             default: return nl_parse_expr_stmt(p, source);
         }
     }
@@ -1014,7 +1077,11 @@ ast_unit nl_parse_source(const lex_item* special_lexicals, const str* source) {
                 if (parse_state.curr.tag == nl_tk_kw_def) {
                     break;
                 }
+
+                parser_consume(&parse_state, source);
             }
+        } else {   
+            dynbuf_push(&temp_roots, next_root_ptr);
         }
     }
 

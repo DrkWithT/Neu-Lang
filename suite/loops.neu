@@ -1,12 +1,14 @@
 `test loop expr and stmt`
 
-let n = 10, m = 0, a1 = 0, a2 = 0;
+def n = 10, m = 0, a1 = 0, a2 = 0;
 
+`
 assert(
-    loop ( ; n > 0 ; n -= 1) {
+    loop (nil ; n > 0 ; n -= 1) {
         a1 += n;
-    } -> (a1) == 55
+    } -> (a1 == 55)
 );
+`
 
 loop (m = 10; m > 0; m -= 1) {
     println(m);
