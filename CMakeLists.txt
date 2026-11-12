@@ -13,6 +13,7 @@ target_sources(neu_impl PRIVATE
     "${NEU_SRCS}/parser.c"
     "${NEU_SRCS}/pool.c"
     "${NEU_SRCS}/bytecode.c"
+    "${NEU_SRCS}/bcc.c"
     "${NEU_SRCS}/var_scope.c"
 )
 
