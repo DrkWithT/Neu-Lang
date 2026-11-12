@@ -19,6 +19,11 @@ dynbuf dynbuf_new(size_t item_size, uint32_t init_cap, nl_deleter_t deleter);
 void dynbuf_del(dynbuf* self);
 
 [[nodiscard]]
+static inline const void* dynbuf_data(const dynbuf* self) {
+    return self->data;
+}
+
+[[nodiscard]]
 static inline bool dynbuf_empty(const dynbuf* self) {
     return !self->data || self->n == 0;
 }
@@ -68,8 +73,3 @@ static inline void* dynbuf_get_mut(dynbuf* self, uint32_t pos) {
 
     return self->data + pos * self->item_size;
 }
-
-
-
-#define CREATE_BUF_OF(TYPE, INITIAL_CAPACITY) dynbuf_new(sizeof(TYPE), (uint32_t)INITIAL_CAPACITY)\
-

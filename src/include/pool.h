@@ -38,11 +38,16 @@ typedef struct nl_entity_pool_t {
     size_t gc_cost;     // "score" of memory usage where GC sweep is needed
     int32_t next_id;    // next ID (corresponds to `mem.data + sizeof(entity_type) * ID`)
     int32_t max_id;     // maximum usable ID
+    int32_t tenure_id;
 } ent_pool;
 
 [[nodiscard]]
 ent_pool ent_pool_new(size_t object_size, int32_t capacity, nl_deleter_t df);
 void ent_pool_del(ent_pool* self);
+
+static inline void ent_pool_tenure(ent_pool* p) {
+    p->tenure_id = p->next_id - 1;
+}
 
 [[nodiscard]]
 static inline bool ent_pool_gc_ripe(const ent_pool* p) {

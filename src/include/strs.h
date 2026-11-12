@@ -43,7 +43,7 @@ bool str_eq_raw(const str* self, const char* cstr, size_t n);
 [[nodiscard]]
 bool str_eq_str(const str* self, const str* rhs);
 
-void str_write_to(FILE* fs, const str* s);
+void str_output(FILE* fs, const str* s);
 
 
 

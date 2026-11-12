@@ -5,6 +5,7 @@
 void chunk_del(void *c) {
     auto chunk_self = (chunk*)c;
 
+    dynbuf_del(&chunk_self->vinfo);
     free(chunk_self->icv);
     chunk_self->icv = nullptr;
     free(chunk_self->kd);
@@ -19,5 +20,11 @@ void program_del(void* pg) {
     ent_pool_del(&program_self->pool_c);
     ent_pool_del(&program_self->pool_o);
     ent_pool_del(&program_self->pool_s);
+
+    if (program_self->gv) {
+        free(program_self->gv);
+        program_self->gv = nullptr;
+    }
+
     dynbuf_del(&program_self->chunks);
 }

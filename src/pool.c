@@ -58,7 +58,8 @@ ent_pool ent_pool_new(size_t object_size, int32_t capacity, nl_deleter_t df) {
         .cost = 0,
         .gc_cost = ent_pool_calc_gc_cost(object_size, capacity, 2, 3),  // ! GC collect this pool if ~ 67% is full.
         .next_id = 0,
-        .max_id = capacity
+        .max_id = capacity,
+        .tenure_id = 0
     };
 }
 
@@ -81,7 +82,7 @@ entity_handle_mut ent_pool_add(ent_pool* self, const void* object_p) {
 }
 
 void ent_pool_erase(ent_pool* self, int32_t cell_id) {
-    if (cell_id < 0 || cell_id >= self->max_id) {
+    if (cell_id <= self->tenure_id || cell_id >= self->max_id) {
         NL_PANIC("Expected ID between [0; max_id) passed to ent_pool_erase()!", __FILE__, __LINE__)
     }
 

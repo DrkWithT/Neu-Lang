@@ -71,7 +71,7 @@ bool str_eq_str(const str* self, const str* rhs) {
     return !strncmp(self->s, rhs->s, self->n);
 }
 
-void str_write_to(FILE* fs, const str* s) {
+void str_output(FILE* fs, const str* s) {
     fwrite(s->s, sizeof(char), s->n, fs);
 }
 

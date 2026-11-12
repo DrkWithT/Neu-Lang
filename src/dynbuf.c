@@ -75,8 +75,9 @@ void* dynbuf_push(dynbuf* self, const void* src) {
 
 [[maybe_unused]]
 size_t dynbuf_pop(dynbuf* self) {
-    // ! IMPORTANT: this does lazy deletion to avoid extra reallocations / shrinking.
-    self->del_fn(dynbuf_last_mut(self));
+    if (self->del_fn != nullptr) {
+        self->del_fn(dynbuf_last_mut(self));
+    }
     
     const auto next_len = --self->n;
 
